@@ -129,11 +129,13 @@ def g2p(input_yomi):
         else:
             output_yomi += nonyouon(input_yomi, i, item)
 
+    output_str = " ".join(output_yomi)
+    output_yomi = output_str.split()
     # 音素を出力
     return output_yomi
 
 # 類義語を検索
-def search_synonym(word):
+def search_synonym(word, criteria_phoneme):
 
     synonym_data = {}
     synonym_data['original'] = word
@@ -177,9 +179,19 @@ def search_synonym(word):
                         if '<unk>' in synonym_phoneme:
                             continue
                         else:
+                            rhyme_pt = 0
+                            # 音素を逆順にする
+                            synonym_phoneme.reverse()
+                            criteria_phoneme.reverse()
+                            for index, p in enumerate(criteria_phoneme):
+                                if p == synonym_phoneme[index]:
+                                    rhyme_pt += 1
+                                else:
+                                    break
+
                             synonym_dic = {
                                 'synonym': synonym,
-                                'phoneme': synonym_phoneme
+                                'rhyme_pt': rhyme_pt
                             }
                             synonym_list.append(synonym_dic)
 
@@ -192,10 +204,10 @@ def search_synonym(word):
 mecab_data = mecab_list(input_text)
 
 # 基準となる単語
-criteria_word = mecab_data[0]
+criteria_word = mecab_data[0]# あとで0以外も考える
 criteria_word.append(g2p(criteria_word[1]))
 print(criteria_word)
 
 for key, v in mecab_data.items():
     if key != 0:
-        print(search_synonym(v[0]))
+        print(search_synonym(v[0], criteria_word[2]))
