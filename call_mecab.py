@@ -86,7 +86,7 @@ def nonyouon(input_yomi, i, item):
     return output_yomi
 
 # 捨て仮名の前　且つ　拗音ではない場合
-def nonyouon_before_st(i):
+def nonyouon_before_st(input_yomi, i):
     output_yomi = []
 
     if input_yomi[i] == "ー" or input_yomi[i] == "〜":
@@ -121,8 +121,8 @@ def g2p(input_yomi):
                     output_yomi.append(g2p_list[youon])
                 # 拗音ではない場合、通常の仮名の音素を出力
                 else:
-                    output_yomi += nonyouon_before_st(i)
-                    output_yomi += nonyouon_before_st(i+1)
+                    output_yomi += nonyouon_before_st(input_yomi, i)
+                    output_yomi += nonyouon_before_st(input_yomi, i+1)
             else:
                 output_yomi += nonyouon(input_yomi, i, item)
         # 末端
@@ -147,11 +147,8 @@ def search_synonym(word):
 
     # Wordnetに存在する語であるかの判定
     if word_id==99999999:
-        # print("「%s」は、Wordnetに存在しない単語です。" % word)
         synonym_data['synonym'] = 'none'
         return synonym_data
-    # else:
-        # print("【「%s」の類似語を出力します】\n" % word)
 
     # 入力された単語を含む概念を検索する
     cur = conn.execute("select synset from sense where wordid='%s'" % word_id)
@@ -160,23 +157,14 @@ def search_synonym(word):
         synsets.append(row[0])
 
     # 概念に含まれる単語を検索して画面出力する
-    # no = 1
     for synset in synsets:
         cur1 = conn.execute("select name from synset where synset='%s'" % synset)
-        # for row1 in cur1:
-            # print("%sつめの概念 : %s" %(no, row1[0]))
         cur2 = conn.execute("select def from synset_def where (synset='%s' and lang='jpn')" % synset)
-        # sub_no = 1
-        # for row2 in cur2:
-            # print("意味%s : %s" %(sub_no, row2[0]))
-            # sub_no += 1
         cur3 = conn.execute("select wordid from sense where (synset='%s' and wordid!=%s)" % (synset,word_id))
-        # sub_no = 1
         for row3 in cur3:
             target_word_id = row3[0]
             cur3_1 = conn.execute("select lemma from word where wordid=%s" % target_word_id)
             for row3_1 in cur3_1:
-                # print("類義語%s : %s" % (sub_no, row3_1[0]))
                 synonym = row3_1[0]
                 if '_' in synonym:
                     continue
@@ -184,15 +172,16 @@ def search_synonym(word):
                     if isalpha(synonym):
                         synonym = alkana.get_kana(synonym)
                     if synonym != None:
-
-
-
-
-
-                        synonym_list.append([synonym, mecab_get_yomi(synonym)])
-                # sub_no += 1
-        # print("\n")
-        # no += 1
+                        synonym_yomi = mecab_get_yomi(synonym)
+                        synonym_phoneme = g2p(synonym_yomi)
+                        if '<unk>' in synonym_phoneme:
+                            continue
+                        else:
+                            synonym_dic = {
+                                'synonym': synonym,
+                                'phoneme': synonym_phoneme
+                            }
+                            synonym_list.append(synonym_dic)
 
     synonym_data['synonym'] = synonym_list
 
