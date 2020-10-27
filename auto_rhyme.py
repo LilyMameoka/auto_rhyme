@@ -18,6 +18,7 @@ with io.open('./g2p_list.json', 'rt') as f:
     g2p_list = json.load(f)
 sutegana = ["ァ", "ィ", "ゥ", "ェ", "ォ", "ヮ", "ャ", "ュ", "ョ"]
 single_p = ["a", "i", "u", "e", "o", "N", "cl", "pau", "fin", "exc", "que"]
+vowel = ["a", "i", "u", "e", "o", "N"]
 
 # 半角英字判定
 alphaReg = re.compile(r'^[a-zA-Z]+$')
@@ -135,11 +136,26 @@ def g2p(input_yomi):
     return output_yomi
 
 # 類義語を検索
-def search_synonym(word, criteria_phoneme):
+def search_synonym(word, criteria_vowel_r):
 
     synonym_data = {}
     synonym_data['original'] = word
-    synonym_list = []
+
+    word_yomi = mecab_get_yomi(word)
+    word_phoneme = g2p(word_yomi)
+    rhyme_pt = 0
+    word_phoneme.reverse()
+    word_vowel_r = [x for x in word_phoneme if x in vowel]
+    for index, p in enumerate(criteria_vowel_r):
+        if p == word_vowel_r[index]:
+            rhyme_pt += 1
+        else:
+            break
+
+    synonym_best = {
+        'word': word,
+        'rhyme_pt': rhyme_pt
+    }
 
     # 問い合わせしたい単語がWordnetに存在するか確認する
     cur = conn.execute("select wordid from word where lemma='%s'" % word)
@@ -149,7 +165,7 @@ def search_synonym(word, criteria_phoneme):
 
     # Wordnetに存在する語であるかの判定
     if word_id==99999999:
-        synonym_data['synonym'] = 'none'
+        synonym_data['synonym'] = synonym_best
         return synonym_data
 
     # 入力された単語を含む概念を検索する
@@ -182,20 +198,22 @@ def search_synonym(word, criteria_phoneme):
                             rhyme_pt = 0
                             # 音素を逆順にする
                             synonym_phoneme.reverse()
-                            criteria_phoneme.reverse()
-                            for index, p in enumerate(criteria_phoneme):
-                                if p == synonym_phoneme[index]:
+
+                            synonym_vowel_r = [x for x in synonym_phoneme if x in vowel]
+
+                            for index, p in enumerate(criteria_vowel_r):
+                                if p == synonym_vowel_r[index]:
                                     rhyme_pt += 1
                                 else:
                                     break
 
-                            synonym_dic = {
-                                'synonym': synonym,
-                                'rhyme_pt': rhyme_pt
-                            }
-                            synonym_list.append(synonym_dic)
+                            if rhyme_pt >= synonym_best['rhyme_pt']:
+                                synonym_best = {
+                                    'word': synonym,
+                                    'rhyme_pt': rhyme_pt
+                                }
 
-    synonym_data['synonym'] = synonym_list
+    synonym_data['synonym'] = synonym_best
 
     return synonym_data
 
@@ -207,7 +225,10 @@ mecab_data = mecab_list(input_text)
 criteria_word = mecab_data[0]# あとで0以外も考える
 criteria_word.append(g2p(criteria_word[1]))
 print(criteria_word)
+criteria_phoneme = criteria_word[2]
+criteria_phoneme.reverse()
+criteria_vowel_r = [y for y in criteria_phoneme if y in vowel]
 
 for key, v in mecab_data.items():
     if key != 0:
-        print(search_synonym(v[0], criteria_word[2]))
+        print(search_synonym(v[0], criteria_vowel_r))
