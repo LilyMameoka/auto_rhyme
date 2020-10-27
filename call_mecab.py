@@ -6,6 +6,7 @@ import sys
 import io
 import json
 import sqlite3
+import alkana
 
 conn = sqlite3.connect('wnjpn.db')
 input_text = sys.argv[1]
@@ -37,50 +38,6 @@ def mecab_list(text):
                     word_class[word_index] = [word, wclass[9]]
         node = node.next
     return word_class
-
-# 特定の単語を入力とした時に、類義語を検索する関数
-def search_synonym(word):
-
-    # 問い合わせしたい単語がWordnetに存在するか確認する
-    cur = conn.execute("select wordid from word where lemma='%s'" % word)
-    word_id = 99999999  #temp
-    for row in cur:
-        word_id = row[0]
-
-    # Wordnetに存在する語であるかの判定
-    if word_id==99999999:
-        print("「%s」は、Wordnetに存在しない単語です。" % word)
-        return
-    else:
-        print("【「%s」の類似語を出力します】\n" % word)
-
-    # 入力された単語を含む概念を検索する
-    cur = conn.execute("select synset from sense where wordid='%s'" % word_id)
-    synsets = []
-    for row in cur:
-        synsets.append(row[0])
-
-    # 概念に含まれる単語を検索して画面出力する
-    no = 1
-    for synset in synsets:
-        cur1 = conn.execute("select name from synset where synset='%s'" % synset)
-        for row1 in cur1:
-            print("%sつめの概念 : %s" %(no, row1[0]))
-        cur2 = conn.execute("select def from synset_def where (synset='%s' and lang='jpn')" % synset)
-        sub_no = 1
-        for row2 in cur2:
-            print("意味%s : %s" %(sub_no, row2[0]))
-            sub_no += 1
-        cur3 = conn.execute("select wordid from sense where (synset='%s' and wordid!=%s)" % (synset,word_id))
-        sub_no = 1
-        for row3 in cur3:
-            target_word_id = row3[0]
-            cur3_1 = conn.execute("select lemma from word where wordid=%s" % target_word_id)
-            for row3_1 in cur3_1:
-                print("類義語%s : %s" % (sub_no, row3_1[0]))
-                sub_no += 1
-        print("\n")
-        no += 1
 
 # 次の文字が捨て仮名でない場合
 def nonyouon(input_yomi, i, item):
@@ -144,16 +101,75 @@ def g2p(input_yomi):
         else:
             output_yomi += nonyouon(input_yomi, i, item)
 
-    # 出力を結合
-    output_str = " ".join(output_yomi)
-
     # 音素を出力
-    return output_str
+    return output_yomi
+
+# 類義語を検索
+def search_synonym(word):
+
+    synonym_data = {}
+    synonym_data['original'] = word
+    synonym_list = []
+
+    # 問い合わせしたい単語がWordnetに存在するか確認する
+    cur = conn.execute("select wordid from word where lemma='%s'" % word)
+    word_id = 99999999  #temp
+    for row in cur:
+        word_id = row[0]
+
+    # Wordnetに存在する語であるかの判定
+    if word_id==99999999:
+        # print("「%s」は、Wordnetに存在しない単語です。" % word)
+        synonym_data['synonym'] = 'none'
+        return synonym_data
+    # else:
+        # print("【「%s」の類似語を出力します】\n" % word)
+
+    # 入力された単語を含む概念を検索する
+    cur = conn.execute("select synset from sense where wordid='%s'" % word_id)
+    synsets = []
+    for row in cur:
+        synsets.append(row[0])
+
+    # 概念に含まれる単語を検索して画面出力する
+    # no = 1
+    for synset in synsets:
+        cur1 = conn.execute("select name from synset where synset='%s'" % synset)
+        # for row1 in cur1:
+            # print("%sつめの概念 : %s" %(no, row1[0]))
+        cur2 = conn.execute("select def from synset_def where (synset='%s' and lang='jpn')" % synset)
+        # sub_no = 1
+        # for row2 in cur2:
+            # print("意味%s : %s" %(sub_no, row2[0]))
+            # sub_no += 1
+        cur3 = conn.execute("select wordid from sense where (synset='%s' and wordid!=%s)" % (synset,word_id))
+        # sub_no = 1
+        for row3 in cur3:
+            target_word_id = row3[0]
+            cur3_1 = conn.execute("select lemma from word where wordid=%s" % target_word_id)
+            for row3_1 in cur3_1:
+                # print("類義語%s : %s" % (sub_no, row3_1[0]))
+                if '_' in row3_1[0]:
+                    continue
+                else:
+                    synonym_list.append(row3_1[0])
+                # sub_no += 1
+        # print("\n")
+        # no += 1
+
+    synonym_data['synonym'] = synonym_list
+
+    return synonym_data
 
 # 実行
 # text(string)
 mecab_data = mecab_list(input_text)
 
+# 基準となる単語
+criteria_word = mecab_data[0]
+criteria_word.append(g2p(criteria_word[1]))
+print(criteria_word)
+
 for key, v in mecab_data.items():
-    print(g2p(v[1]))
-    search_synonym(v[0])
+    if key != 0:
+        print(search_synonym(v[0]))
