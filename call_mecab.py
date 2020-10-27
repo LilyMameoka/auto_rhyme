@@ -3,10 +3,19 @@
 import MeCab
 import jaconv
 import sys
+import io
+import json
 import sqlite3
 
 conn = sqlite3.connect('wnjpn.db')
 input_text = sys.argv[1]
+
+# g2pのみを行う(アクセント記号を揃えることはしない)
+# 音素の対応表をロード
+with io.open('./g2p_list.json', 'rt') as f:
+    g2p_list = json.load(f)
+sutegana = ["ァ", "ィ", "ゥ", "ェ", "ォ", "ヮ", "ャ", "ュ", "ョ"]
+single_p = ["a", "i", "u", "e", "o", "N", "cl", "pau", "fin", "exc", "que"]
 
 def mecab_list(text):
     tagger = MeCab.Tagger("-d /usr/local/lib/mecab/dic/unidic")
@@ -18,20 +27,16 @@ def mecab_list(text):
         word = node.surface
         wclass = node.feature.split(',')
         if wclass[0] == '名詞':
-          word_index += 1
-          if len(wclass) <= 10:
-            word_class[word_index] = [word, word]
-          else:
-            if len(wclass[9]) == 0 :
-              word_class[word_index] = [word, word]
+            word_index += 1
+            if len(wclass) <= 10:
+                word_class[word_index] = [word, word]
             else:
-              word_class[word_index] = [word, wclass[9]]
+                if len(wclass[9]) == 0:
+                    word_class[word_index] = [word, word]
+                else:
+                    word_class[word_index] = [word, wclass[9]]
         node = node.next
     return word_class
-
-def get_text(input_text):
-  # get pron
-  mecab_data = mecab_list(input_text)
 
 # 特定の単語を入力とした時に、類義語を検索する関数
 def search_synonym(word):
@@ -77,7 +82,78 @@ def search_synonym(word):
         print("\n")
         no += 1
 
+# 次の文字が捨て仮名でない場合
+def nonyouon(input_yomi, i, item):
+    output_yomi = []
+    # 捨て仮名は拗音として出力済
+    if item in sutegana:
+        pass
+    # (通常)
+    elif item in g2p_list:
+        output_yomi.append(g2p_list[item])
+    # 長音符は直前の母音を出力
+    elif item == "ー" or item == "〜":
+        output_yomi.append(g2p_list[input_yomi[i-1]][-1])
+    # 不要な記号
+    else:
+        output_yomi.append("<unk>")
+
+    return output_yomi
+
+# 捨て仮名の前　且つ　拗音ではない場合
+def nonyouon_before_st(i):
+    output_yomi = []
+
+    if input_yomi[i] == "ー" or input_yomi[i] == "〜":
+        output_yomi.append(g2p_list[input_yomi[i-1]][-1])
+
+    else:
+        # 読みの出力
+        output_yomi.append(g2p_list[input_yomi[i]])
+
+    return output_yomi
+
+# 以下g2pの処理
+def g2p(input_yomi):
+    # 全て全角カタカナに変換
+    input_yomi = jaconv.h2z(input_yomi)
+    input_yomi = jaconv.hira2kata(input_yomi)
+
+    output_yomi = []
+
+    for i, item in enumerate(input_yomi):
+
+        # 先頭に長音符がきたら読まない
+        if i == 0 and (item == "ー" or item == "〜"):
+            pass
+
+        # 文字列の、末端で無いとき、次の文字が捨て仮名で無いか確認する
+        elif i < len(input_yomi)-1:
+            if input_yomi[i+1] in sutegana:
+                youon = item+input_yomi[i+1]
+                # 拗音の音素を出力
+                if youon in g2p_list:
+                    output_yomi.append(g2p_list[youon])
+                # 拗音ではない場合、通常の仮名の音素を出力
+                else:
+                    output_yomi += nonyouon_before_st(i)
+                    output_yomi += nonyouon_before_st(i+1)
+            else:
+                output_yomi += nonyouon(input_yomi, i, item)
+        # 末端
+        else:
+            output_yomi += nonyouon(input_yomi, i, item)
+
+    # 出力を結合
+    output_str = " ".join(output_yomi)
+
+    # 音素を出力
+    return output_str
+
 # 実行
 # text(string)
-get_text(input_text)
-search_synonym("月")
+mecab_data = mecab_list(input_text)
+
+for key, v in mecab_data.items():
+    print(g2p(v[1]))
+    search_synonym(v[0])
