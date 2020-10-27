@@ -7,6 +7,7 @@ import io
 import json
 import sqlite3
 import alkana
+import re
 
 conn = sqlite3.connect('wnjpn.db')
 input_text = sys.argv[1]
@@ -17,6 +18,11 @@ with io.open('./g2p_list.json', 'rt') as f:
     g2p_list = json.load(f)
 sutegana = ["ァ", "ィ", "ゥ", "ェ", "ォ", "ヮ", "ャ", "ュ", "ョ"]
 single_p = ["a", "i", "u", "e", "o", "N", "cl", "pau", "fin", "exc", "que"]
+
+#半角英字判定
+alphaReg = re.compile(r'^[a-zA-Z]+$')
+def isalpha(s):
+    return alphaReg.match(s) is not None
 
 def mecab_list(text):
     tagger = MeCab.Tagger("-d /usr/local/lib/mecab/dic/unidic")
@@ -149,10 +155,13 @@ def search_synonym(word):
             cur3_1 = conn.execute("select lemma from word where wordid=%s" % target_word_id)
             for row3_1 in cur3_1:
                 # print("類義語%s : %s" % (sub_no, row3_1[0]))
-                if '_' in row3_1[0]:
+                synonym = row3_1[0]
+                if '_' in synonym:
                     continue
                 else:
-                    synonym_list.append(row3_1[0])
+                    if isalpha(synonym):
+                        synonym = alkana.get_kana(synonym)
+                    synonym_list.append(synonym)
                 # sub_no += 1
         # print("\n")
         # no += 1
