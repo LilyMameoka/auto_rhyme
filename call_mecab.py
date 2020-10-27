@@ -19,11 +19,12 @@ with io.open('./g2p_list.json', 'rt') as f:
 sutegana = ["ァ", "ィ", "ゥ", "ェ", "ォ", "ヮ", "ャ", "ュ", "ョ"]
 single_p = ["a", "i", "u", "e", "o", "N", "cl", "pau", "fin", "exc", "que"]
 
-#半角英字判定
+# 半角英字判定
 alphaReg = re.compile(r'^[a-zA-Z]+$')
 def isalpha(s):
     return alphaReg.match(s) is not None
 
+# 文->名詞を抽出->{index:[単語,ヨミ]}
 def mecab_list(text):
     tagger = MeCab.Tagger("-d /usr/local/lib/mecab/dic/unidic")
     tagger.parse('')
@@ -44,6 +45,27 @@ def mecab_list(text):
                     word_class[word_index] = [word, wclass[9]]
         node = node.next
     return word_class
+
+# 日本語->ヨミ
+def mecab_get_yomi(text):
+    tagger = MeCab.Tagger("-d /usr/local/lib/mecab/dic/unidic")
+    tagger.parse('')
+    node = tagger.parseToNode(text)
+    yomi = ''
+    while node:
+        word = node.surface
+        wclass = node.feature.split(',')
+        if len(wclass) <= 10:
+            yomi += word
+        else:
+            if len(wclass[9]) == 0:
+                yomi += word
+            else:
+                yomi += wclass[9]
+        node = node.next
+
+    yomi = yomi.replace('*', '')
+    return yomi
 
 # 次の文字が捨て仮名でない場合
 def nonyouon(input_yomi, i, item):
@@ -76,7 +98,7 @@ def nonyouon_before_st(i):
 
     return output_yomi
 
-# 以下g2pの処理
+# ヨミ->[音素]
 def g2p(input_yomi):
     # 全て全角カタカナに変換
     input_yomi = jaconv.h2z(input_yomi)
@@ -161,7 +183,13 @@ def search_synonym(word):
                 else:
                     if isalpha(synonym):
                         synonym = alkana.get_kana(synonym)
-                    synonym_list.append(synonym)
+                    if synonym != None:
+
+
+
+
+
+                        synonym_list.append([synonym, mecab_get_yomi(synonym)])
                 # sub_no += 1
         # print("\n")
         # no += 1
