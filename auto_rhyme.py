@@ -202,12 +202,15 @@ def search_synonym(word, criteria_vowel_r):
                             synonym_vowel_r = [x for x in synonym_phoneme if x in vowel]
 
                             for index, p in enumerate(criteria_vowel_r):
-                                if p == synonym_vowel_r[index]:
-                                    rhyme_pt += 1
+                                if index < len(synonym_vowel_r):
+                                    if p == synonym_vowel_r[index]:
+                                        rhyme_pt += 1
+                                    else:
+                                        break
                                 else:
                                     break
 
-                            if rhyme_pt >= synonym_best['rhyme_pt']:
+                            if rhyme_pt > synonym_best['rhyme_pt']:
                                 synonym_best = {
                                     'word': synonym,
                                     'rhyme_pt': rhyme_pt
@@ -231,4 +234,7 @@ criteria_vowel_r = [y for y in criteria_phoneme if y in vowel]
 
 for key, v in mecab_data.items():
     if key != 0:
-        print(search_synonym(v[0], criteria_vowel_r))
+        result = search_synonym(v[0], criteria_vowel_r)
+        input_text = input_text.replace(v[0], result['synonym']['word'])
+
+print(input_text)
