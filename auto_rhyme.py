@@ -176,8 +176,6 @@ def search_synonym(word, criteria_vowel_r):
 
     # 概念に含まれる単語を検索して画面出力する
     for synset in synsets:
-        cur1 = conn.execute("select name from synset where synset='%s'" % synset)
-        cur2 = conn.execute("select def from synset_def where (synset='%s' and lang='jpn')" % synset)
         cur3 = conn.execute("select wordid from sense where (synset='%s' and wordid!=%s)" % (synset,word_id))
         for row3 in cur3:
             target_word_id = row3[0]
@@ -201,12 +199,9 @@ def search_synonym(word, criteria_vowel_r):
 
                             synonym_vowel_r = [x for x in synonym_phoneme if x in vowel]
 
-                            for index, p in enumerate(criteria_vowel_r):
-                                if index < len(synonym_vowel_r):
-                                    if p == synonym_vowel_r[index]:
-                                        rhyme_pt += 1
-                                    else:
-                                        break
+                            for index in range(min(len(criteria_vowel_r), len(synonym_vowel_r))):
+                                if criteria_vowel_r[index] == synonym_vowel_r[index]:
+                                    rhyme_pt += 1
                                 else:
                                     break
 
@@ -224,17 +219,29 @@ def search_synonym(word, criteria_vowel_r):
 # text(string)
 mecab_data = mecab_list(input_text)
 
-# 基準となる単語
-criteria_word = mecab_data[0]# あとで0以外も考える
-criteria_word.append(g2p(criteria_word[1]))
-print(criteria_word)
-criteria_phoneme = criteria_word[2]
-criteria_phoneme.reverse()
-criteria_vowel_r = [y for y in criteria_phoneme if y in vowel]
+replaced_text_list = []
+recomend = ''
+best_rhyme_pt_sum = 0
 
-for key, v in mecab_data.items():
-    if key != 0:
-        result = search_synonym(v[0], criteria_vowel_r)
-        input_text = input_text.replace(v[0], result['synonym']['word'])
+for criteria_word_index, criteria_word in mecab_data.items():
+    # 基準となる単語の設定
+    criteria_word.append(g2p(criteria_word[1]))
+    criteria_phoneme = criteria_word[2]
+    criteria_phoneme.reverse()
+    criteria_vowel_r = [y for y in criteria_phoneme if y in vowel]
 
-print(input_text)
+    rhyme_pt_sum = 0
+
+    for key, v in mecab_data.items():
+        if key != criteria_word_index:
+            result = search_synonym(v[0], criteria_vowel_r)
+            rhyme_pt_sum += result['synonym']['rhyme_pt']
+            input_text_replaced = input_text.replace(v[0], result['synonym']['word'])
+
+    if best_rhyme_pt_sum <= rhyme_pt_sum:
+        best_rhyme_pt_sum = rhyme_pt_sum
+        recomend = input_text_replaced
+    replaced_text_list.append([input_text_replaced, rhyme_pt_sum])
+
+print(recomend)
+print(best_rhyme_pt_sum)
