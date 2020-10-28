@@ -219,7 +219,6 @@ def search_synonym(word, criteria_vowel_r):
 # text(string)
 mecab_data = mecab_list(input_text)
 
-replaced_text_list = []
 recomend = ''
 best_rhyme_pt_sum = 0
 
@@ -241,7 +240,5 @@ for criteria_word_index, criteria_word in mecab_data.items():
     if best_rhyme_pt_sum <= rhyme_pt_sum:
         best_rhyme_pt_sum = rhyme_pt_sum
         recomend = input_text_replaced
-    replaced_text_list.append([input_text_replaced, rhyme_pt_sum])
 
 print(recomend)
-print(best_rhyme_pt_sum)
